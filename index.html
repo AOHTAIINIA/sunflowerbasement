@@ -3,28 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TERMINAL // ACCESS_POINT</title>
+    <title>ПРОЕКТ [НЕСАНКЦИОНИРОВАННЫЙ ДОСТУП]</title>
     <style>
+        /* Стили старого CRT-монитора */
         body {
-            background-color: #050505;
-            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+            background-color: #030804;
+            color: #1aff55;
             font-family: 'Courier New', Courier, monospace;
-            padding: 40px;
-            text-shadow: 0 0 5px #00ff41;
+            overflow-x: hidden;
+            text-shadow: 0 0 4px #1aff55;
         }
-        a { color: #ff3333; text-decoration: none; }
-        a:hover { text-decoration: underline; background: #220000; }
-        .box { border: 1px solid #00ff41; padding: 20px; max-width: 600px; }
+
+        /* Эффект сетки кинескопа (сканлайны) поверх всего экрана */
+        body::before {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 100;
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            border: 1px solid #145214;
+            padding: 25px;
+            box-shadow: inset 0 0 15px rgba(0, 255, 65, 0.1);
+        }
+
+        h1, h2 {
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px dashed #1aff55;
+            padding-bottom: 5px;
+        }
+
+        p, label {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        button {
+            background: #0d2811;
+            color: #1aff55;
+            border: 1px solid #1aff55;
+            padding: 8px 16px;
+            font-family: inherit;
+            cursor: pointer;
+            margin: 5px 0;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #1aff55;
+            color: #000;
+            box-shadow: 0 0 10px #1aff55;
+        }
+
+        textarea, input {
+            width: 100%;
+            box-sizing: border-box;
+            background: #021005;
+            border: 1px solid #145214;
+            color: #1aff55;
+            font-family: inherit;
+            padding: 10px;
+            margin-top: 5px;
+            outline: none;
+        }
+
+        textarea:focus, input:focus {
+            border-color: #1aff55;
+        }
+
+        .box {
+            margin: 25px 0;
+            padding: 15px;
+            border: 1px solid #145214;
+            background: rgba(0, 20, 5, 0.4);
+        }
+
+        .output-box {
+            margin-top: 10px;
+            padding: 10px;
+            min-height: 30px;
+            background: #000;
+            border-left: 3px solid #ff3333;
+            color: #ff5555;
+            text-shadow: 0 0 3px #ff3333;
+            font-size: 15px;
+        }
+
+        .nav-links a {
+            color: #ff3333;
+            text-decoration: none;
+            display: inline-block;
+            margin-right: 15px;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+
+        /* Мигающий курсор */
+        .blink {
+            animation: blinker 1s linear infinite;
+        }
+        @keyframes blinker {
+            50% { opacity: 0; }
+        }
     </style>
 </head>
 <body>
+
+<div class="container">
+    <p>>> СТАТУС: ПОДКЛЮЧЕНО К АРХИВУ 09-B <span class="blink">█</span></p>
+    <h1>НЕИЗВЕСТНЫЙ ТЕРМИНАЛ</h1>
+    <p>Если вы видите этот экран, протокол изоляции был нарушен. Не пытайтесь перезагрузить узел.</p>
+    
+    <!-- Кнопка включения фонового гула -->
+    <button onclick="toggleAudio()">[ ВКЛЮЧИТЬ/ВЫКЛЮЧИТЬ СВЯЗЬ (ЗВУК) ]</button>
+
+    <!-- ИНСТРУМЕНТ 1: Генератор странных фраз -->
     <div class="box">
-        <h2>[СИСТЕМА: СТАТУС ПОВРЕЖДЕН]</h2>
-        <p>Архив закрыт протоколом 0x99. Доступ разрешен только через терминал.</p>
-        <ul>
-            <li><a href="tools/decoder.html">>> Запустить частотный декодер</a></li>
-            <li><a href="archives/tape-01.html">>> Восстановить видеопоток (Запись 01)</a></li>
-        </ul>
+        <h2>Модуль 01 // Перехват сигнала</h2>
+        <p>Поймать фрагмент передачи с заброшенной вышки:</p>
+        <button onclick="generateSignal()">ПЕРЕХВАТИТЬ ПАКЕТ</button>
+        <div id="signalOutput" class="output-box">Ожидание входящего потока...</div>
     </div>
+
+    <!-- ИНСТРУМЕНТ 2: Декодер текста -->
+    <div class="box">
+        <h2>Модуль 02 // Ручной декодер</h2>
+        <p>Введите зашифрованный текст или Base64 для инверсии:</p>
+        <textarea id="cipherInput" rows="3" placeholder="Введите символы сюда..."></textarea>
+        <button onclick="decodeText()">РАСШИФРОВАТЬ</button>
+        <div id="cipherOutput" class="output-box">Результат дешифрации появится здесь.</div>
+    </div>
+
+    <!-- Навигация на будущие страницы -->
+    <div class="box nav-links">
+        <h2>Разделы архива:</h2>
+        <p>
+            <a href="#">[ Кассета 01: Наблюдение ]</a>
+            <a href="#">[ Скачать протокол (.bin) ]</a>
+            <a href="#">[ Заблокированный сектор ]</a>
+        </p>
+    </div>
+</div>
+
+<script>
+    // --- Логика генератора сигналов ---
+    const signals = [
+        "ОНИ ЗНАЮТ, ЧТО ТЫ СМОТРИШЬ В ЭКРАН.",
+        "ОШИБКА 77: Субъект покинул периметр в 03:14.",
+        "НЕ ОТКРЫВАЙТЕ ДВЕРЬ НА ТРЕТИЙ ЗВОНОК.",
+        "Частота 434.2 МГц передает звуки дыхания под водой.",
+        "Сенсоры в подвале зафиксировали изменение массы на 80 кг.",
+        "ПРИКАЗ: Удалить все записи от 14 октября 1994 года."
+    ];
+
+    function generateSignal() {
+        const randomIndex = Math.floor(Math.random() * signals.length);
+        document.getElementById('signalOutput').innerText = ">> " + signals[randomIndex];
+    }
+
+    // --- Логика декодера ---
+    function decodeText() {
+        const input = document.getElementById('cipherInput').value.trim();
+        const output = document.getElementById('cipherOutput');
+        
+        if (!input) {
+            output.innerText = "ОШИБКА: Поле ввода пусто.";
+            return;
+        }
+
+        try {
+            // Пробуем расшифровать Base64
+            output.innerText = atob(input);
+        } catch (e) {
+            // Если не Base64 — просто переворачиваем текст задом наперед
+            output.innerText = input.split('').reverse().join('');
+        }
+    }
+
+    // --- Генератор жуткого фонового гула (без внешних файлов) ---
+    let audioCtx = null;
+    let isPlaying = false;
+    let oscillator = null;
+
+    function toggleAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        if (isPlaying) {
+            oscillator.stop();
+            isPlaying = false;
+        } else {
+            oscillator = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            // Низкая жуткая частота 55 Гц
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(55, audioCtx.currentTime);
+            
+            // Очень тихий звук, чтобы не оглушить
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+
+            oscillator.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            oscillator.start();
+            isPlaying = true;
+        }
+    }
+</script>
 </body>
 </html>
