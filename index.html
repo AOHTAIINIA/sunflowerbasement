@@ -153,17 +153,16 @@
       const rawDist = Math.hypot(rawDx, rawDy);
       const angle = Math.atan2(rawDx, rawDy);
 
-      const maxDist = window.innerHeight - 100;
+      const maxDist = window.innerHeight - 50;
       let targetDist = restLength;
 
       if (rawDist > restLength) {
-        const extra = rawDist - restLength;
-        const maxExtra = maxDist - restLength;
-        const progress = Math.min(1, extra / (window.innerHeight * 1.8));
-        const tension = Math.pow(progress, 2.4);
-        targetDist = restLength + maxExtra * tension;
+        const maxPull = window.innerHeight - restLength;
+        const progress = Math.min(1, Math.max(0, (rawDist - restLength) / maxPull));
+        const tension = Math.pow(progress, 1.2);
+        targetDist = restLength + (maxDist - restLength) * tension;
       } else {
-        targetDist = Math.max(60, rawDist);
+        targetDist = Math.max(50, rawDist);
       }
 
       targetX = anchorX + Math.sin(angle) * targetDist;
