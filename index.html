@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title></title>
+  <title>Bulb</title>
   <style>
     * {
       margin: 0;
@@ -29,27 +29,28 @@
 
     #light {
       position: absolute;
-      width: 450px;
-      height: 450px;
+      width: 480px;
+      height: 480px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 160, 40, 0.12) 0%, rgba(180, 80, 10, 0.04) 35%, rgba(40, 15, 0, 0.01) 55%, transparent 70%);
+      background: radial-gradient(circle, rgba(255, 150, 30, 0.12) 0%, rgba(180, 75, 10, 0.04) 35%, rgba(40, 15, 0, 0.01) 60%, transparent 72%);
       mix-blend-mode: screen;
       pointer-events: none;
       transform: translate(-50%, -50%);
-      z-index: 15;
+      z-index: 20;
       will-change: left, top;
     }
 
     #wire {
       position: absolute;
-      width: 8px;
+      width: 5px;
       object-fit: fill;
       transform-origin: 50% 0;
       pointer-events: none;
       user-select: none;
       -webkit-user-drag: none;
-      z-index: 6;
-      filter: brightness(1.2) drop-shadow(0 0 1px rgba(255, 170, 50, 0.35));
+      z-index: 5;
+      background: linear-gradient(90deg, #1f1f1f, #4a4a4a 50%, #181818);
+      box-shadow: 0 0 2px rgba(255, 170, 40, 0.25);
       will-change: transform, height, left, top;
     }
 
@@ -81,16 +82,15 @@
     const bulb = document.getElementById('bulb');
     const light = document.getElementById('light');
 
-    const wireWidth = 8;
-    const bulbWidth = 80;
+    bulb.ondragstart = () => false;
 
     let anchorX = window.innerWidth / 2;
     let anchorY = 0;
 
     const restLength = 220;
     const stiffness = 0.06;
-    const gravity = 0.6;
-    const damping = 0.982;
+    const gravity = 0.65;
+    const damping = 0.978;
 
     let x = anchorX;
     let y = restLength;
@@ -108,57 +108,51 @@
     bulb.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       isDragging = true;
-      bulb.setPointerCapture(e.pointerId);
       bulb.style.cursor = 'grabbing';
-      updateTarget(e.clientX, e.clientY);
+      updateDragTarget(e.clientX, e.clientY);
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
     });
 
-    bulb.addEventListener('pointermove', (e) => {
+    function onPointerMove(e) {
       if (!isDragging) return;
-      updateTarget(e.clientX, e.clientY);
-    });
+      updateDragTarget(e.clientX, e.clientY);
+    }
 
-    bulb.addEventListener('pointerup', (e) => {
+    function onPointerUp() {
       if (!isDragging) return;
       isDragging = false;
-      try {
-        bulb.releasePointerCapture(e.pointerId);
-      } catch (err) {}
       bulb.style.cursor = 'grab';
-    });
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    }
 
-    bulb.addEventListener('pointercancel', () => {
-      isDragging = false;
-      bulb.style.cursor = 'grab';
-    });
+    function updateDragTarget(clientX, clientY) {
+      const maxBottom = window.innerHeight - 150;
+      const clampedMouseY = Math.max(60, Math.min(window.innerHeight, clientY));
 
-    function updateTarget(clientX, clientY) {
-      let rawDx = clientX - anchorX;
-      let rawDy = clientY - anchorY;
-
-      if (rawDy < 50) rawDy = 50;
-
-      const rawDist = Math.hypot(rawDx, rawDy);
-      const angle = Math.atan2(rawDx, rawDy);
-
-      const maxReach = window.innerHeight - 120;
-      let targetDist = rawDist;
-
-      if (rawDist > restLength) {
-        const extra = rawDist - restLength;
-        const available = Math.max(100, maxReach - restLength);
-        const tension = 1 - Math.exp(-extra / (available * 1.5));
-        targetDist = restLength + available * tension;
+      let calculatedY = clampedMouseY;
+      if (clampedMouseY > restLength) {
+        const progress = (clampedMouseY - restLength) / (window.innerHeight - restLength);
+        const resistanceCurve = Math.pow(progress, 1.45);
+        calculatedY = restLength + (maxBottom - restLength) * resistanceCurve;
       }
 
-      targetX = anchorX + Math.sin(angle) * targetDist;
-      targetY = anchorY + Math.cos(angle) * targetDist;
+      const rawDx = clientX - anchorX;
+      const maxSide = window.innerWidth * 0.45;
+      const sideProgress = Math.max(-1, Math.min(1, rawDx / maxSide));
+      const calculatedX = anchorX + sideProgress * maxSide * 0.7;
+
+      targetX = calculatedX;
+      targetY = calculatedY;
     }
 
     function render() {
       if (isDragging) {
-        vx = (targetX - x) * 0.16;
-        vy = (targetY - y) * 0.16;
+        vx = (targetX - x) * 0.15;
+        vy = (targetY - y) * 0.15;
         x += vx;
         y += vy;
       } else {
@@ -180,20 +174,21 @@
       const dx = x - anchorX;
       const dy = y - anchorY;
       const dist = Math.hypot(dx, dy);
-      const angle = Math.atan2(dx, dy);
+      const wireAngle = Math.atan2(dx, dy);
+      const bulbAngle = wireAngle * 0.35;
 
-      wire.style.left = (anchorX - wireWidth / 2) + 'px';
+      wire.style.left = anchorX + 'px';
       wire.style.top = anchorY + 'px';
-      wire.style.height = (dist + 4) + 'px';
-      wire.style.transform = `rotate(${angle}rad)`;
+      wire.style.height = (dist + 3) + 'px';
+      wire.style.transform = `translate(-50%, 0) rotate(${wireAngle}rad)`;
 
-      bulb.style.left = (x - bulbWidth / 2) + 'px';
+      bulb.style.left = x + 'px';
       bulb.style.top = y + 'px';
-      bulb.style.transform = `rotate(${angle}rad)`;
+      bulb.style.transform = `translate(-50%, 0) rotate(${bulbAngle}rad)`;
 
       const filamentOffset = 46;
-      const lightX = x + Math.sin(angle) * filamentOffset;
-      const lightY = y + Math.cos(angle) * filamentOffset;
+      const lightX = x + Math.sin(bulbAngle) * filamentOffset;
+      const lightY = y + Math.cos(bulbAngle) * filamentOffset;
 
       light.style.left = lightX + 'px';
       light.style.top = lightY + 'px';
