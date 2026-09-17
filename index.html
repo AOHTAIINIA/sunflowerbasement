@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Concept</title>
+  <title></title>
   <style>
-      
     * {
       margin: 0;
       padding: 0;
@@ -18,27 +17,184 @@
       background-color: #000000;
       overflow: hidden;
       user-select: none;
+      -webkit-user-select: none;
     }
 
     #scene {
       position: relative;
       width: 100vw;
       height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
       background-color: #000000;
+    }
+
+    #light {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 185, 70, 0.45) 0%, rgba(255, 140, 20, 0.2) 30%, rgba(255, 100, 0, 0.05) 60%, transparent 75%);
+      mix-blend-mode: screen;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      will-change: left, top;
+    }
+
+    #wire {
+      position: absolute;
+      width: 6px;
+      object-fit: fill;
+      transform-origin: top center;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+      will-change: transform, height;
+    }
+
+    #bulb {
+      position: absolute;
+      width: 80px;
+      height: auto;
+      transform-origin: top center;
+      cursor: grab;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+      touch-action: none;
+      will-change: transform, left, top;
     }
   </style>
 </head>
 <body>
 
   <main id="scene">
-
+    <div id="light"></div>
+    <img id="wire" src="wire.png" alt="">
+    <img id="bulb" src="bulb.png" alt="">
   </main>
 
   <script>
+    const wire = document.getElementById('wire');
+    const bulb = document.getElementById('bulb');
+    const light = document.getElementById('light');
 
+    let anchorX = window.innerWidth / 2;
+    let anchorY = 0;
+
+    const restLength = 220;
+    const maxStretch = 300;
+    const stiffness = 0.04;
+    const gravity = 0.5;
+    const damping = 0.985;
+
+    let x = anchorX;
+    let y = restLength;
+    let vx = 0;
+    let vy = 0;
+
+    let isDragging = false;
+    let targetX = x;
+    let targetY = y;
+
+    window.addEventListener('resize', () => {
+      anchorX = window.innerWidth / 2;
+    });
+
+    bulb.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      bulb.setPointerCapture(e.pointerId);
+      bulb.style.cursor = 'grabbing';
+      updateTargetPosition(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      updateTargetPosition(e.clientX, e.clientY);
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        bulb.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+      bulb.style.cursor = 'grab';
+    });
+
+    window.addEventListener('pointercancel', () => {
+      isDragging = false;
+      bulb.style.cursor = 'grab';
+    });
+
+    function updateTargetPosition(clientX, clientY) {
+      let dx = clientX - anchorX;
+      let dy = clientY - anchorY;
+
+      if (dy < 30) dy = 30;
+
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxStretch) {
+        dx = (dx / dist) * maxStretch;
+        dy = (dy / dist) * maxStretch;
+      }
+
+      targetX = anchorX + dx;
+      targetY = anchorY + dy;
+    }
+
+    function animate() {
+      if (isDragging) {
+        vx = targetX - x;
+        vy = targetY - y;
+        x = targetX;
+        y = targetY;
+      } else {
+        const dx = x - anchorX;
+        const dy = y - anchorY;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        const nx = dx / dist;
+        const ny = dy / dist;
+
+        const spring = -stiffness * (dist - restLength);
+
+        vx = (vx + spring * nx) * damping;
+        vy = (vy + spring * ny + gravity) * damping;
+
+        x += vx;
+        y += vy;
+
+        const currentDist = Math.hypot(x - anchorX, y - anchorY);
+        if (currentDist > maxStretch) {
+          x = anchorX + (x - anchorX) / currentDist * maxStretch;
+          y = anchorY + (y - anchorY) / currentDist * maxStretch;
+        }
+      }
+
+      const dx = x - anchorX;
+      const dy = y - anchorY;
+      const currentDist = Math.hypot(dx, dy);
+      const angle = -Math.atan2(dx, dy);
+
+      wire.style.left = anchorX + 'px';
+      wire.style.top = anchorY + 'px';
+      wire.style.height = currentDist + 'px';
+      wire.style.transform = `translateX(-50%) rotate(${angle}rad)`;
+
+      bulb.style.left = x + 'px';
+      bulb.style.top = y + 'px';
+      bulb.style.transform = `translate(-50%, 0) rotate(${angle}rad)`;
+
+      const filamentOffset = 45;
+      const lightX = x + Math.sin(-angle) * filamentOffset;
+      const lightY = y + Math.cos(-angle) * filamentOffset;
+
+      light.style.left = lightX + 'px';
+      light.style.top = lightY + 'px';
+
+      requestAnimationFrame(animate);
+    }
+
+    animate();
   </script>
 </body>
 </html>
