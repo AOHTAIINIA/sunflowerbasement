@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bulb</title>
+  <title></title>
   <style>
     * {
       margin: 0;
@@ -42,7 +42,7 @@
       width: 440px;
       height: 440px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 145, 25, 0.08) 0%, rgba(180, 60, 10, 0.025) 35%, rgba(30, 10, 0, 0.005) 60%, transparent 75%);
+      background: radial-gradient(circle, rgba(255, 140, 25, 0.08) 0%, rgba(180, 60, 10, 0.025) 35%, rgba(30, 10, 0, 0.005) 60%, transparent 75%);
       mix-blend-mode: screen;
       pointer-events: none;
       transform: translate(-50%, -50%);
@@ -89,15 +89,14 @@
 
     const numPoints = 18;
     const restLength = 220;
-    const baseSegLength = restLength / (numPoints - 1);
-    let activeSegLength = baseSegLength;
+    const restSegLength = restLength / (numPoints - 1);
 
-    const gravity = 0.42;
-    const damping = 0.985;
+    const gravity = 0.45;
+    const damping = 0.984;
 
     const points = [];
     for (let i = 0; i < numPoints; i++) {
-      const py = baseSegLength * i;
+      const py = restSegLength * i;
       points.push({
         x: anchorX,
         y: py,
@@ -115,7 +114,7 @@
       canvas.height = window.innerHeight;
       anchorX = window.innerWidth / 2;
       points[0].x = anchorX;
-      points[0].y = anchorY;
+      points[0].y = 0;
     }
 
     window.addEventListener('resize', resize);
@@ -124,30 +123,33 @@
     bulb.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       isDragging = true;
+      try {
+        bulb.setPointerCapture(e.pointerId);
+      } catch (err) {}
       bulb.style.cursor = 'grabbing';
-      updateTarget(e.clientX, e.clientY);
-      window.addEventListener('pointermove', onPointerMove);
-      window.addEventListener('pointerup', onPointerUp);
-      window.addEventListener('pointercancel', onPointerUp);
+      updateDrag(e.clientX, e.clientY);
     });
 
-    function onPointerMove(e) {
+    window.addEventListener('pointermove', (e) => {
       if (!isDragging) return;
-      updateTarget(e.clientX, e.clientY);
-    }
+      updateDrag(e.clientX, e.clientY);
+    });
 
-    function onPointerUp() {
+    function endDrag(e) {
       if (!isDragging) return;
       isDragging = false;
+      try {
+        bulb.releasePointerCapture(e.pointerId);
+      } catch (err) {}
       bulb.style.cursor = 'grab';
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerUp);
     }
 
-    function updateTarget(clientX, clientY) {
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+
+    function updateDrag(clientX, clientY) {
       const rawDx = clientX - anchorX;
-      const rawDy = Math.max(50, clientY - anchorY);
+      const rawDy = Math.max(40, clientY - anchorY);
       const rawDist = Math.hypot(rawDx, rawDy);
       const angle = Math.atan2(rawDx, rawDy);
 
@@ -157,11 +159,11 @@
       if (rawDist > restLength) {
         const extra = rawDist - restLength;
         const maxExtra = maxDist - restLength;
-        const progress = Math.min(1, extra / (window.innerHeight * 1.5));
-        const tension = Math.pow(progress, 1.6);
+        const progress = Math.min(1, extra / (window.innerHeight * 1.8));
+        const tension = Math.pow(progress, 2.4);
         targetDist = restLength + maxExtra * tension;
       } else {
-        targetDist = Math.max(80, rawDist);
+        targetDist = Math.max(60, rawDist);
       }
 
       targetX = anchorX + Math.sin(angle) * targetDist;
@@ -169,6 +171,8 @@
     }
 
     function updatePhysics() {
+      const pEnd = points[numPoints - 1];
+
       for (let i = 1; i < numPoints; i++) {
         const p = points[i];
         if (isDragging && i === numPoints - 1) continue;
@@ -184,20 +188,23 @@
       }
 
       if (isDragging) {
-        const pEnd = points[numPoints - 1];
         pEnd.oldX = pEnd.x;
         pEnd.oldY = pEnd.y;
-        pEnd.x += (targetX - pEnd.x) * 0.3;
-        pEnd.y += (targetY - pEnd.y) * 0.3;
+        pEnd.x += (targetX - pEnd.x) * 0.35;
+        pEnd.y += (targetY - pEnd.y) * 0.35;
       }
 
-      const currentDist = Math.hypot(points[numPoints - 1].x - anchorX, points[numPoints - 1].y - anchorY);
-      const desiredSeg = isDragging ? Math.max(baseSegLength, currentDist / (numPoints - 1)) : baseSegLength;
-      activeSegLength += (desiredSeg - activeSegLength) * 0.15;
+      const currentDist = Math.hypot(pEnd.x - anchorX, pEnd.y - anchorY);
+      const segLen = isDragging ? Math.max(restSegLength, currentDist / (numPoints - 1)) : restSegLength;
 
-      for (let iter = 0; iter < 16; iter++) {
+      for (let iter = 0; iter < 18; iter++) {
         points[0].x = anchorX;
-        points[0].y = anchorY;
+        points[0].y = 0;
+
+        if (isDragging) {
+          pEnd.x = targetX;
+          pEnd.y = targetY;
+        }
 
         for (let i = 0; i < numPoints - 1; i++) {
           const p1 = points[i];
@@ -205,7 +212,7 @@
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
           const dist = Math.hypot(dx, dy) || 0.001;
-          const diff = (dist - activeSegLength) / dist;
+          const diff = (dist - segLen) / dist;
 
           if (i === 0) {
             p2.x -= dx * diff;
@@ -237,13 +244,12 @@
       }
       ctx.lineTo(points[numPoints - 1].x, points[numPoints - 1].y);
 
-      ctx.strokeStyle = '#121212';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#111111';
+      ctx.lineWidth = 4.5;
       ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
       ctx.stroke();
 
-      ctx.strokeStyle = '#2d2d2d';
+      ctx.strokeStyle = '#2c2c2c';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
@@ -252,14 +258,19 @@
 
       const dx = pEnd.x - pPrev.x;
       const dy = pEnd.y - pPrev.y;
-      const angle = Math.atan2(dx, dy);
+      const len = Math.hypot(dx, dy) || 1;
 
-      bulb.style.left = pEnd.x + 'px';
+      const nx = dx / len;
+      const ny = dy / len;
+
+      const rotAngle = -Math.atan2(dx, dy);
+
+      bulb.style.left = (pEnd.x - bulbWidth / 2) + 'px';
       bulb.style.top = pEnd.y + 'px';
-      bulb.style.transform = `translate(-50%, 0) rotate(${angle}rad)`;
+      bulb.style.transform = `rotate(${rotAngle}rad)`;
 
-      const lightX = pEnd.x + Math.sin(angle) * filamentOffset;
-      const lightY = pEnd.y + Math.cos(angle) * filamentOffset;
+      const lightX = pEnd.x + nx * filamentOffset;
+      const lightY = pEnd.y + ny * filamentOffset;
 
       light.style.left = lightX + 'px';
       light.style.top = lightY + 'px';
