@@ -39,14 +39,14 @@
 
     #light {
       position: absolute;
-      width: 440px;
-      height: 440px;
+      width: 460px;
+      height: 460px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 140, 25, 0.08) 0%, rgba(180, 60, 10, 0.025) 35%, rgba(30, 10, 0, 0.005) 60%, transparent 75%);
+      background: radial-gradient(circle, rgba(255, 140, 25, 0.09) 0%, rgba(180, 60, 10, 0.025) 35%, rgba(30, 10, 0, 0.005) 60%, transparent 75%);
       mix-blend-mode: screen;
       pointer-events: none;
       transform: translate(-50%, -50%);
-      z-index: 20;
+      z-index: 25;
       will-change: left, top;
     }
 
@@ -60,8 +60,64 @@
       user-select: none;
       -webkit-user-drag: none;
       touch-action: none;
-      z-index: 10;
+      z-index: 20;
       will-change: transform, left, top;
+    }
+
+    #creature-container {
+      position: absolute;
+      bottom: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 420px;
+      height: 450px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #body-img {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 250px;
+      height: auto;
+      z-index: 12;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .maggot {
+      position: absolute;
+      width: 140px;
+      height: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+      will-change: transform;
+    }
+
+    #maggot-left {
+      top: 155px;
+      left: 70px;
+      transform-origin: 90% 25%;
+      z-index: 11;
+    }
+
+    #maggot-right {
+      top: 155px;
+      right: 70px;
+      transform-origin: 10% 25%;
+      transform: scaleX(-1);
+      z-index: 11;
+    }
+
+    #shatter-flash {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 99999;
     }
   </style>
 </head>
@@ -71,6 +127,14 @@
     <canvas id="wireCanvas"></canvas>
     <div id="light"></div>
     <img id="bulb" src="bulb.png" alt="">
+
+    <div id="creature-container">
+      <img id="maggot-left" class="maggot" src="maggot.png" alt="">
+      <img id="maggot-right" class="maggot" src="maggot.png" alt="">
+      <img id="body-img" src="body.png" alt="">
+    </div>
+
+    <div id="shatter-flash"></div>
   </main>
 
   <script>
@@ -78,6 +142,9 @@
     const ctx = canvas.getContext('2d');
     const bulb = document.getElementById('bulb');
     const light = document.getElementById('light');
+    const maggotLeft = document.getElementById('maggot-left');
+    const maggotRight = document.getElementById('maggot-right');
+    const flash = document.getElementById('shatter-flash');
 
     bulb.ondragstart = () => false;
 
@@ -97,15 +164,11 @@
     const points = [];
     for (let i = 0; i < numPoints; i++) {
       const py = restSegLength * i;
-      points.push({
-        x: anchorX,
-        y: py,
-        oldX: anchorX,
-        oldY: py
-      });
+      points.push({ x: anchorX, y: py, oldX: anchorX, oldY: py });
     }
 
     let isDragging = false;
+    let isDead = false;
     let targetX = anchorX;
     let targetY = restLength;
 
@@ -121,26 +184,23 @@
     resize();
 
     bulb.addEventListener('pointerdown', (e) => {
+      if (isDead) return;
       e.preventDefault();
       isDragging = true;
-      try {
-        bulb.setPointerCapture(e.pointerId);
-      } catch (err) {}
+      try { bulb.setPointerCapture(e.pointerId); } catch (err) {}
       bulb.style.cursor = 'grabbing';
       updateDrag(e.clientX, e.clientY);
     });
 
     window.addEventListener('pointermove', (e) => {
-      if (!isDragging) return;
+      if (!isDragging || isDead) return;
       updateDrag(e.clientX, e.clientY);
     });
 
     function endDrag(e) {
       if (!isDragging) return;
       isDragging = false;
-      try {
-        bulb.releasePointerCapture(e.pointerId);
-      } catch (err) {}
+      try { bulb.releasePointerCapture(e.pointerId); } catch (err) {}
       bulb.style.cursor = 'grab';
     }
 
@@ -229,7 +289,58 @@
       }
     }
 
-    function render() {
+    function playGlassCrackSound() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const bufferSize = audioCtx.sampleRate * 0.4;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
+        }
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 2400;
+        noise.connect(filter);
+        filter.connect(audioCtx.destination);
+        noise.start();
+      } catch (err) {}
+    }
+
+    function breakAndKillSite() {
+      if (isDead) return;
+      isDead = true;
+      isDragging = false;
+
+      playGlassCrackSound();
+
+      flash.style.opacity = '1';
+      bulb.style.display = 'none';
+      light.style.display = 'none';
+
+      setTimeout(() => {
+        flash.style.background = '#000000';
+        document.body.innerHTML = '';
+        document.body.style.backgroundColor = '#000000';
+
+        try {
+          window.close();
+        } catch (e) {}
+
+        setTimeout(() => {
+          location.href = 'about:blank';
+        }, 300);
+      }, 70);
+    }
+
+    let leftAngleCur = 0;
+    let rightAngleCur = 0;
+
+    function render(time) {
+      if (isDead) return;
+
       updatePhysics();
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -258,26 +369,70 @@
       const dx = pEnd.x - pPrev.x;
       const dy = pEnd.y - pPrev.y;
       const len = Math.hypot(dx, dy) || 1;
-
-      const nx = dx / len;
-      const ny = dy / len;
-
       const rotAngle = -Math.atan2(dx, dy);
 
       bulb.style.left = (pEnd.x - bulbWidth / 2) + 'px';
       bulb.style.top = pEnd.y + 'px';
       bulb.style.transform = `rotate(${rotAngle}rad)`;
 
-      const lightX = pEnd.x + nx * filamentOffset;
-      const lightY = pEnd.y + ny * filamentOffset;
+      const lightX = pEnd.x + (dx / len) * filamentOffset;
+      const lightY = pEnd.y + (dy / len) * filamentOffset;
 
       light.style.left = lightX + 'px';
       light.style.top = lightY + 'px';
 
+      const t = time * 0.003;
+
+      const rectL = maggotLeft.getBoundingClientRect();
+      const originLX = rectL.left + rectL.width * 0.9;
+      const originLY = rectL.top + rectL.height * 0.25;
+
+      const rectR = maggotRight.getBoundingClientRect();
+      const originRX = rectR.left + rectR.width * 0.1;
+      const originRY = rectR.top + rectR.height * 0.25;
+
+      const distL = Math.hypot(lightX - originLX, lightY - originLY);
+      const distR = Math.hypot(lightX - originRX, lightY - originRY);
+
+      if (distL < 90 || distR < 90) {
+        breakAndKillSite();
+        return;
+      }
+
+      const idleL = Math.sin(t * 1.8) * 14 + Math.sin(t * 3.4) * 8;
+      const idleR = Math.sin(t * 1.6 + 2) * 14 + Math.sin(t * 3.1 + 1) * 8;
+
+      const reactRange = 460;
+
+      let targetAngleL = idleL;
+      if (distL < reactRange) {
+        const directAngleL = Math.atan2(lightY - originLY, lightX - originLX) * (180 / Math.PI) + 180;
+        const k = 1 - Math.min(1, distL / reactRange);
+        targetAngleL = idleL * (1 - k) + (directAngleL - 180) * k;
+      }
+
+      let targetAngleR = idleR;
+      if (distR < reactRange) {
+        const directAngleR = Math.atan2(lightY - originRY, lightX - originRX) * (180 / Math.PI);
+        const k = 1 - Math.min(1, distR / reactRange);
+        targetAngleR = idleR * (1 - k) + (-directAngleR) * k;
+      }
+
+      leftAngleCur += (targetAngleL - leftAngleCur) * 0.08;
+      rightAngleCur += (targetAngleR - rightAngleCur) * 0.08;
+
+      const squirmL = 1 + Math.sin(t * 4) * 0.08;
+      const squirmR = 1 + Math.sin(t * 4.3 + 1.2) * 0.08;
+      const stretchL = distL < reactRange ? 1 + (1 - distL / reactRange) * 0.22 : 1;
+      const stretchR = distR < reactRange ? 1 + (1 - distR / reactRange) * 0.22 : 1;
+
+      maggotLeft.style.transform = `rotate(${leftAngleCur}deg) scaleX(${stretchL}) scaleY(${squirmL}) skewX(${Math.sin(t * 2) * 6}deg)`;
+      maggotRight.style.transform = `scaleX(-1) rotate(${rightAngleCur}deg) scaleX(${stretchR}) scaleY(${squirmR}) skewX(${Math.sin(t * 2.2) * 6}deg)`;
+
       requestAnimationFrame(render);
     }
 
-    render();
+    requestAnimationFrame(render);
   </script>
 </body>
 </html>
