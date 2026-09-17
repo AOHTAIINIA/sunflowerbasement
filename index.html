@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bulb</title>
+  <title>Bulb Concept</title>
   <style>
     * {
       margin: 0;
@@ -29,10 +29,10 @@
 
     #light {
       position: absolute;
-      width: 480px;
-      height: 480px;
+      width: 460px;
+      height: 460px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(255, 150, 30, 0.12) 0%, rgba(180, 75, 10, 0.04) 35%, rgba(40, 15, 0, 0.01) 60%, transparent 72%);
+      background: radial-gradient(circle, rgba(255, 140, 25, 0.08) 0%, rgba(180, 60, 10, 0.025) 35%, rgba(30, 10, 0, 0.005) 60%, transparent 75%);
       mix-blend-mode: screen;
       pointer-events: none;
       transform: translate(-50%, -50%);
@@ -42,15 +42,13 @@
 
     #wire {
       position: absolute;
-      width: 5px;
+      width: 6px;
       object-fit: fill;
       transform-origin: 50% 0;
       pointer-events: none;
       user-select: none;
       -webkit-user-drag: none;
       z-index: 5;
-      background: linear-gradient(90deg, #1f1f1f, #4a4a4a 50%, #181818);
-      box-shadow: 0 0 2px rgba(255, 170, 40, 0.25);
       will-change: transform, height, left, top;
     }
 
@@ -84,13 +82,17 @@
 
     bulb.ondragstart = () => false;
 
+    const wireWidth = 6;
+    const bulbWidth = 80;
+    const filamentOffset = 58;
+
     let anchorX = window.innerWidth / 2;
     let anchorY = 0;
 
     const restLength = 220;
-    const stiffness = 0.06;
-    const gravity = 0.65;
-    const damping = 0.978;
+    const stiffness = 0.055;
+    const gravity = 0.6;
+    const damping = 0.982;
 
     let x = anchorX;
     let y = restLength;
@@ -109,7 +111,7 @@
       e.preventDefault();
       isDragging = true;
       bulb.style.cursor = 'grabbing';
-      updateDragTarget(e.clientX, e.clientY);
+      updateTarget(e.clientX, e.clientY);
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
       window.addEventListener('pointercancel', onPointerUp);
@@ -117,7 +119,7 @@
 
     function onPointerMove(e) {
       if (!isDragging) return;
-      updateDragTarget(e.clientX, e.clientY);
+      updateTarget(e.clientX, e.clientY);
     }
 
     function onPointerUp() {
@@ -129,30 +131,29 @@
       window.removeEventListener('pointercancel', onPointerUp);
     }
 
-    function updateDragTarget(clientX, clientY) {
-      const maxBottom = window.innerHeight - 150;
-      const clampedMouseY = Math.max(60, Math.min(window.innerHeight, clientY));
+    function updateTarget(clientX, clientY) {
+      const maxBottom = window.innerHeight - 130;
+      const availableY = maxBottom - restLength;
 
-      let calculatedY = clampedMouseY;
-      if (clampedMouseY > restLength) {
-        const progress = (clampedMouseY - restLength) / (window.innerHeight - restLength);
-        const resistanceCurve = Math.pow(progress, 1.45);
-        calculatedY = restLength + (maxBottom - restLength) * resistanceCurve;
-      }
+      let pullY = (clientY - restLength) / (window.innerHeight - restLength);
+      pullY = Math.max(0, Math.min(1, pullY));
+
+      const tensionY = Math.pow(pullY, 1.85);
+      targetY = restLength + availableY * tensionY;
 
       const rawDx = clientX - anchorX;
-      const maxSide = window.innerWidth * 0.45;
-      const sideProgress = Math.max(-1, Math.min(1, rawDx / maxSide));
-      const calculatedX = anchorX + sideProgress * maxSide * 0.7;
+      const maxSide = window.innerWidth * 0.42;
+      let pullX = rawDx / maxSide;
+      pullX = Math.max(-1, Math.min(1, pullX));
 
-      targetX = calculatedX;
-      targetY = calculatedY;
+      const tensionX = Math.sign(pullX) * Math.pow(Math.abs(pullX), 1.3);
+      targetX = anchorX + tensionX * maxSide;
     }
 
     function render() {
       if (isDragging) {
-        vx = (targetX - x) * 0.15;
-        vy = (targetY - y) * 0.15;
+        vx = (targetX - x) * 0.12;
+        vy = (targetY - y) * 0.12;
         x += vx;
         y += vy;
       } else {
@@ -173,22 +174,20 @@
 
       const dx = x - anchorX;
       const dy = y - anchorY;
-      const dist = Math.hypot(dx, dy);
-      const wireAngle = Math.atan2(dx, dy);
-      const bulbAngle = wireAngle * 0.35;
+      const dist = Math.hypot(dx, dy) || 1;
+      const angle = -Math.atan2(dx, dy);
 
-      wire.style.left = anchorX + 'px';
+      wire.style.left = (anchorX - wireWidth / 2) + 'px';
       wire.style.top = anchorY + 'px';
-      wire.style.height = (dist + 3) + 'px';
-      wire.style.transform = `translate(-50%, 0) rotate(${wireAngle}rad)`;
+      wire.style.height = (dist + 4) + 'px';
+      wire.style.transform = `rotate(${angle}rad)`;
 
-      bulb.style.left = x + 'px';
+      bulb.style.left = (x - bulbWidth / 2) + 'px';
       bulb.style.top = y + 'px';
-      bulb.style.transform = `translate(-50%, 0) rotate(${bulbAngle}rad)`;
+      bulb.style.transform = `rotate(${angle}rad)`;
 
-      const filamentOffset = 46;
-      const lightX = x + Math.sin(bulbAngle) * filamentOffset;
-      const lightY = y + Math.cos(bulbAngle) * filamentOffset;
+      const lightX = x + (dx / dist) * filamentOffset;
+      const lightY = y + (dy / dist) * filamentOffset;
 
       light.style.left = lightX + 'px';
       light.style.top = lightY + 'px';
