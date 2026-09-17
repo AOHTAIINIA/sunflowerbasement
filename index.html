@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title></title>
+  <title>Bulb</title>
   <style>
     * {
       margin: 0;
@@ -87,15 +87,17 @@
     let anchorX = window.innerWidth / 2;
     let anchorY = 0;
 
-    const numPoints = 16;
-    const restLength = 230;
-    const restSegLength = restLength / (numPoints - 1);
-    const gravity = 0.38;
-    const damping = 0.982;
+    const numPoints = 18;
+    const restLength = 220;
+    const baseSegLength = restLength / (numPoints - 1);
+    let activeSegLength = baseSegLength;
+
+    const gravity = 0.42;
+    const damping = 0.985;
 
     const points = [];
     for (let i = 0; i < numPoints; i++) {
-      const py = (restLength / (numPoints - 1)) * i;
+      const py = baseSegLength * i;
       points.push({
         x: anchorX,
         y: py,
@@ -123,7 +125,7 @@
       e.preventDefault();
       isDragging = true;
       bulb.style.cursor = 'grabbing';
-      updateDrag(e.clientX, e.clientY);
+      updateTarget(e.clientX, e.clientY);
       window.addEventListener('pointermove', onPointerMove);
       window.addEventListener('pointerup', onPointerUp);
       window.addEventListener('pointercancel', onPointerUp);
@@ -131,7 +133,7 @@
 
     function onPointerMove(e) {
       if (!isDragging) return;
-      updateDrag(e.clientX, e.clientY);
+      updateTarget(e.clientX, e.clientY);
     }
 
     function onPointerUp() {
@@ -143,19 +145,24 @@
       window.removeEventListener('pointercancel', onPointerUp);
     }
 
-    function updateDrag(clientX, clientY) {
+    function updateTarget(clientX, clientY) {
       const rawDx = clientX - anchorX;
-      const rawDy = Math.max(60, clientY - anchorY);
+      const rawDy = Math.max(50, clientY - anchorY);
+      const rawDist = Math.hypot(rawDx, rawDy);
       const angle = Math.atan2(rawDx, rawDy);
 
-      const maxReach = window.innerHeight - 130;
-      const pullRange = maxReach - restLength;
+      const maxDist = window.innerHeight - 100;
+      let targetDist = restLength;
 
-      let pullY = (clientY - restLength) / (window.innerHeight - restLength);
-      pullY = Math.max(0, Math.min(1, pullY));
-
-      const tensionY = Math.pow(pullY, 2.2);
-      const targetDist = restLength + pullRange * tensionY;
+      if (rawDist > restLength) {
+        const extra = rawDist - restLength;
+        const maxExtra = maxDist - restLength;
+        const progress = Math.min(1, extra / (window.innerHeight * 1.5));
+        const tension = Math.pow(progress, 1.6);
+        targetDist = restLength + maxExtra * tension;
+      } else {
+        targetDist = Math.max(80, rawDist);
+      }
 
       targetX = anchorX + Math.sin(angle) * targetDist;
       targetY = anchorY + Math.cos(angle) * targetDist;
@@ -164,7 +171,7 @@
     function updatePhysics() {
       for (let i = 1; i < numPoints; i++) {
         const p = points[i];
-        if (i === numPoints - 1 && isDragging) continue;
+        if (isDragging && i === numPoints - 1) continue;
 
         const vx = (p.x - p.oldX) * damping;
         const vy = (p.y - p.oldY) * damping;
@@ -177,17 +184,18 @@
       }
 
       if (isDragging) {
-        const endPoint = points[numPoints - 1];
-        endPoint.oldX = endPoint.x;
-        endPoint.oldY = endPoint.y;
-        endPoint.x += (targetX - endPoint.x) * 0.25;
-        endPoint.y += (targetY - endPoint.y) * 0.25;
+        const pEnd = points[numPoints - 1];
+        pEnd.oldX = pEnd.x;
+        pEnd.oldY = pEnd.y;
+        pEnd.x += (targetX - pEnd.x) * 0.3;
+        pEnd.y += (targetY - pEnd.y) * 0.3;
       }
 
-      const currentTotalDist = Math.hypot(points[numPoints - 1].x - anchorX, points[numPoints - 1].y - anchorY);
-      const segLength = Math.max(restSegLength, currentTotalDist / (numPoints - 1));
+      const currentDist = Math.hypot(points[numPoints - 1].x - anchorX, points[numPoints - 1].y - anchorY);
+      const desiredSeg = isDragging ? Math.max(baseSegLength, currentDist / (numPoints - 1)) : baseSegLength;
+      activeSegLength += (desiredSeg - activeSegLength) * 0.15;
 
-      for (let iter = 0; iter < 12; iter++) {
+      for (let iter = 0; iter < 16; iter++) {
         points[0].x = anchorX;
         points[0].y = anchorY;
 
@@ -196,8 +204,8 @@
           const p2 = points[i + 1];
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
-          const dist = Math.hypot(dx, dy) || 1;
-          const diff = (dist - segLength) / dist;
+          const dist = Math.hypot(dx, dy) || 0.001;
+          const diff = (dist - activeSegLength) / dist;
 
           if (i === 0) {
             p2.x -= dx * diff;
@@ -229,13 +237,13 @@
       }
       ctx.lineTo(points[numPoints - 1].x, points[numPoints - 1].y);
 
-      ctx.strokeStyle = '#111111';
+      ctx.strokeStyle = '#121212';
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
 
-      ctx.strokeStyle = '#2b2b2b';
+      ctx.strokeStyle = '#2d2d2d';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
@@ -244,15 +252,14 @@
 
       const dx = pEnd.x - pPrev.x;
       const dy = pEnd.y - pPrev.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      const angle = -Math.atan2(dx, dy);
+      const angle = Math.atan2(dx, dy);
 
-      bulb.style.left = (pEnd.x - bulbWidth / 2) + 'px';
+      bulb.style.left = pEnd.x + 'px';
       bulb.style.top = pEnd.y + 'px';
-      bulb.style.transform = `rotate(${angle}rad)`;
+      bulb.style.transform = `translate(-50%, 0) rotate(${angle}rad)`;
 
-      const lightX = pEnd.x + (dx / dist) * filamentOffset;
-      const lightY = pEnd.y + (dy / dist) * filamentOffset;
+      const lightX = pEnd.x + Math.sin(angle) * filamentOffset;
+      const lightY = pEnd.y + Math.cos(angle) * filamentOffset;
 
       light.style.left = lightX + 'px';
       light.style.top = lightY + 'px';
