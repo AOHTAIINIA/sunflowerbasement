@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bulb</title>
+  <title></title>
   <style>
     * {
       margin: 0;
@@ -29,8 +29,8 @@
 
     #light {
       position: absolute;
-      width: 500px;
-      height: 500px;
+      width: 450px;
+      height: 450px;
       border-radius: 50%;
       background: radial-gradient(circle, rgba(255, 160, 40, 0.12) 0%, rgba(180, 80, 10, 0.04) 35%, rgba(40, 15, 0, 0.01) 55%, transparent 70%);
       mix-blend-mode: screen;
@@ -42,13 +42,14 @@
 
     #wire {
       position: absolute;
-      width: 6px;
+      width: 8px;
       object-fit: fill;
       transform-origin: 50% 0;
       pointer-events: none;
       user-select: none;
       -webkit-user-drag: none;
-      z-index: 5;
+      z-index: 6;
+      filter: brightness(1.2) drop-shadow(0 0 1px rgba(255, 170, 50, 0.35));
       will-change: transform, height, left, top;
     }
 
@@ -80,17 +81,16 @@
     const bulb = document.getElementById('bulb');
     const light = document.getElementById('light');
 
-    const wireWidth = 6;
+    const wireWidth = 8;
     const bulbWidth = 80;
 
     let anchorX = window.innerWidth / 2;
     let anchorY = 0;
 
-    const restLength = 260;
-    const maxStretch = 330;
-    const stiffness = 0.045;
-    const gravity = 0.55;
-    const damping = 0.985;
+    const restLength = 220;
+    const stiffness = 0.06;
+    const gravity = 0.6;
+    const damping = 0.982;
 
     let x = anchorX;
     let y = restLength;
@@ -133,27 +133,34 @@
     });
 
     function updateTarget(clientX, clientY) {
-      let dx = clientX - anchorX;
-      let dy = clientY - anchorY;
+      let rawDx = clientX - anchorX;
+      let rawDy = clientY - anchorY;
 
-      if (dy < 60) dy = 60;
+      if (rawDy < 50) rawDy = 50;
 
-      const dist = Math.hypot(dx, dy);
-      if (dist > maxStretch) {
-        dx = (dx / dist) * maxStretch;
-        dy = (dy / dist) * maxStretch;
+      const rawDist = Math.hypot(rawDx, rawDy);
+      const angle = Math.atan2(rawDx, rawDy);
+
+      const maxReach = window.innerHeight - 120;
+      let targetDist = rawDist;
+
+      if (rawDist > restLength) {
+        const extra = rawDist - restLength;
+        const available = Math.max(100, maxReach - restLength);
+        const tension = 1 - Math.exp(-extra / (available * 1.5));
+        targetDist = restLength + available * tension;
       }
 
-      targetX = anchorX + dx;
-      targetY = anchorY + dy;
+      targetX = anchorX + Math.sin(angle) * targetDist;
+      targetY = anchorY + Math.cos(angle) * targetDist;
     }
 
     function render() {
       if (isDragging) {
-        vx = (targetX - x) * 0.45;
-        vy = (targetY - y) * 0.45;
-        x = targetX;
-        y = targetY;
+        vx = (targetX - x) * 0.16;
+        vy = (targetY - y) * 0.16;
+        x += vx;
+        y += vy;
       } else {
         const dx = x - anchorX;
         const dy = y - anchorY;
@@ -168,31 +175,25 @@
 
         x += vx;
         y += vy;
-
-        const currentDist = Math.hypot(x - anchorX, y - anchorY);
-        if (currentDist > maxStretch) {
-          x = anchorX + ((x - anchorX) / currentDist) * maxStretch;
-          y = anchorY + ((y - anchorY) / currentDist) * maxStretch;
-        }
       }
 
       const dx = x - anchorX;
       const dy = y - anchorY;
       const dist = Math.hypot(dx, dy);
-      const angle = -Math.atan2(dx, dy);
+      const angle = Math.atan2(dx, dy);
 
       wire.style.left = (anchorX - wireWidth / 2) + 'px';
       wire.style.top = anchorY + 'px';
-      wire.style.height = (dist + 3) + 'px';
+      wire.style.height = (dist + 4) + 'px';
       wire.style.transform = `rotate(${angle}rad)`;
 
       bulb.style.left = (x - bulbWidth / 2) + 'px';
       bulb.style.top = y + 'px';
       bulb.style.transform = `rotate(${angle}rad)`;
 
-      const filamentOffset = 48;
-      const lightX = x + Math.sin(-angle) * filamentOffset;
-      const lightY = y + Math.cos(-angle) * filamentOffset;
+      const filamentOffset = 46;
+      const lightX = x + Math.sin(angle) * filamentOffset;
+      const lightY = y + Math.cos(angle) * filamentOffset;
 
       light.style.left = lightX + 'px';
       light.style.top = lightY + 'px';
