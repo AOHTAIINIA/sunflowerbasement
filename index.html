@@ -69,7 +69,7 @@
       bottom: -10px;
       left: 50%;
       transform: translateX(-50%);
-      width: 360px;
+      width: 380px;
       pointer-events: none;
       z-index: 10;
     }
@@ -86,18 +86,18 @@
 
     .arm-socket {
       position: absolute;
-      top: 130px;
+      top: 135px;
       width: 0;
       height: 0;
       z-index: 8;
     }
 
     #shoulder-left {
-      left: 62px;
+      left: 65px;
     }
 
     #shoulder-right {
-      right: 62px;
+      right: 65px;
     }
 
     .maggot-joint {
@@ -110,9 +110,9 @@
 
     .maggot-img {
       position: absolute;
-      left: -85px;
-      bottom: -30px;
-      width: 170px;
+      left: -110px;
+      bottom: -35px;
+      width: 220px;
       height: auto;
       display: block;
       user-select: none;
@@ -123,6 +123,15 @@
 
     #maggot-right-img {
       transform: scaleX(-1);
+    }
+
+    #flash {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 99999;
     }
   </style>
 </head>
@@ -148,6 +157,8 @@
 
       <img id="body-img" src="body.png" alt="">
     </div>
+
+    <div id="flash"></div>
   </main>
 
   <script>
@@ -161,12 +172,13 @@
     const maggotRightImg = document.getElementById('maggot-right-img');
     const shoulderLeft = document.getElementById('shoulder-left');
     const shoulderRight = document.getElementById('shoulder-right');
+    const flash = document.getElementById('flash');
 
     bulb.ondragstart = () => false;
 
     const bulbWidth = 80;
     const filamentOffset = 58;
-    const maggotReach = 210;
+    const maggotBaseReach = 200;
 
     let anchorX = window.innerWidth / 2;
     let anchorY = 0;
@@ -189,13 +201,6 @@
     let targetX = anchorX;
     let targetY = restLength;
 
-    let audioCtx = null;
-    function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-    }
-
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -209,7 +214,6 @@
 
     bulb.addEventListener('pointerdown', (e) => {
       if (isDead) return;
-      initAudio();
       e.preventDefault();
       isDragging = true;
       try { bulb.setPointerCapture(e.pointerId); } catch (err) {}
@@ -314,33 +318,12 @@
       }
     }
 
-    function playGlassCrack() {
-      if (!audioCtx) return;
-      try {
-        const bufferSize = audioCtx.sampleRate * 0.25;
-        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.08));
-        }
-        const noise = audioCtx.createBufferSource();
-        noise.buffer = buffer;
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 3200;
-        noise.connect(filter);
-        filter.connect(audioCtx.destination);
-        noise.start();
-      } catch (err) {}
-    }
-
     function breakBulbAndClose() {
       if (isDead) return;
       isDead = true;
       isDragging = false;
 
-      playGlassCrack();
-
+      flash.style.opacity = '1';
       bulb.style.display = 'none';
       light.style.display = 'none';
       canvas.style.display = 'none';
@@ -359,14 +342,6 @@
       }, 50);
     }
 
-    function distToSegment(px, py, x1, y1, x2, y2) {
-      const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
-      if (l2 === 0) return Math.hypot(px - x1, py - y1);
-      let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
-      t = Math.max(0, Math.min(1, t));
-      return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
-    }
-
     const restAngleL = -1.25;
     const restAngleR = 1.25;
 
@@ -376,8 +351,8 @@
     let curStretchL = 1;
     let curStretchR = 1;
 
-    let phaseL = Math.random() * 100;
-    let phaseR = Math.random() * 100;
+    let phaseL = 12.4;
+    let phaseR = 88.9;
     let twitchL = 0;
     let twitchR = 0;
 
@@ -423,11 +398,11 @@
       bulb.style.top = pEnd.y + 'px';
       bulb.style.transform = `rotate(${rotAngle}rad)`;
 
-      const bulbCenterBottomX = pEnd.x + (dx / len) * 55;
-      const bulbCenterBottomY = pEnd.y + (dy / len) * 55;
+      const bulbCenterX = pEnd.x + (dx / len) * 55;
+      const bulbCenterY = pEnd.y + (dy / len) * 55;
 
-      light.style.left = bulbCenterBottomX + 'px';
-      light.style.top = bulbCenterBottomY + 'px';
+      light.style.left = bulbCenterX + 'px';
+      light.style.top = bulbCenterY + 'px';
 
       const rectL = shoulderLeft.getBoundingClientRect();
       const originLX = rectL.left;
@@ -437,89 +412,96 @@
       const originRX = rectR.left;
       const originRY = rectR.top;
 
-      const distLightL = Math.hypot(bulbCenterBottomX - originLX, bulbCenterBottomY - originLY);
-      const distLightR = Math.hypot(bulbCenterBottomX - originRX, bulbCenterBottomY - originRY);
+      const distLightL = Math.hypot(bulbCenterX - originLX, bulbCenterY - originLY);
+      const distLightR = Math.hypot(bulbCenterX - originRX, bulbCenterY - originRY);
 
-      const lightDetectRange = 380;
-      const inRangeL = distLightL < lightDetectRange;
-      const inRangeR = distLightR < lightDetectRange;
+      const triggerZone = 340;
+      const inZoneL = distLightL < triggerZone;
+      const inZoneR = distLightR < triggerZone;
 
-      if (Math.random() < 0.035) twitchL = (Math.random() - 0.5) * 1.5;
-      if (Math.random() < 0.035) twitchR = (Math.random() - 0.5) * 1.5;
-      twitchL *= 0.88;
-      twitchR *= 0.88;
+      if (Math.random() < 0.04) twitchL = (Math.random() - 0.5) * 1.8;
+      if (Math.random() < 0.04) twitchR = (Math.random() - 0.5) * 1.8;
+      twitchL *= 0.85;
+      twitchR *= 0.85;
 
-      phaseL += dt * (inRangeL ? 7.0 : 2.5);
-      phaseR += dt * (inRangeR ? 7.0 : 3.1);
+      phaseL += dt * (inZoneL ? 9.0 : 2.7);
+      phaseR += dt * (inZoneR ? 8.4 : 3.4);
 
-      const idleL = Math.sin(phaseL * 0.9) * 0.45
-                  + Math.cos(phaseL * 2.3) * 0.25
-                  + Math.sin(phaseL * 0.4) * 0.3
+      const idleL = Math.sin(phaseL * 0.95) * 0.42
+                  + Math.cos(phaseL * 2.1) * 0.22
+                  + Math.sin(phaseL * 0.37) * 0.3
                   + twitchL;
 
-      const idleR = Math.sin(phaseR * 0.8 + 1.4) * 0.45
-                  + Math.cos(phaseR * 2.1 + 0.7) * 0.25
-                  + Math.sin(phaseR * 0.5 + 2.2) * 0.3
+      const idleR = Math.sin(phaseR * 0.82 + 1.9) * 0.42
+                  + Math.cos(phaseR * 1.9 + 0.5) * 0.22
+                  + Math.sin(phaseR * 0.44 + 2.8) * 0.3
                   + twitchR;
 
       let targetAngleL = restAngleL + idleL;
       let targetStretchL = 1;
 
-      if (inRangeL) {
-        const directL = Math.atan2(bulbCenterBottomX - originLX, -(bulbCenterBottomY - originLY));
-        const reachFactorL = Math.min(1, Math.max(0, (lightDetectRange - distLightL) / lightDetectRange));
-        const aggressiveFactorL = Math.pow(reachFactorL, 0.45);
-        targetAngleL = targetAngleL * (1 - aggressiveFactorL) + directL * aggressiveFactorL;
-        targetStretchL = 1 + aggressiveFactorL * 0.45;
+      if (inZoneL) {
+        const directL = Math.atan2(bulbCenterX - originLX, -(bulbCenterY - originLY));
+        const kL = Math.pow((triggerZone - distLightL) / triggerZone, 0.5);
+        const lungeJitterL = Math.sin(currentTime * 0.06) * 0.15;
+        targetAngleL = targetAngleL * (1 - kL) + (directL + lungeJitterL) * kL;
+        targetStretchL = 1 + kL * 0.5;
       }
 
       let targetAngleR = restAngleR + idleR;
       let targetStretchR = 1;
 
-      if (inRangeR) {
-        const directR = Math.atan2(bulbCenterBottomX - originRX, -(bulbCenterBottomY - originRY));
-        const reachFactorR = Math.min(1, Math.max(0, (lightDetectRange - distLightR) / lightDetectRange));
-        const aggressiveFactorR = Math.pow(reachFactorR, 0.45);
-        targetAngleR = targetAngleR * (1 - aggressiveFactorR) + directR * aggressiveFactorR;
-        targetStretchR = 1 + aggressiveFactorR * 0.45;
+      if (inZoneR) {
+        const directR = Math.atan2(bulbCenterX - originRX, -(bulbCenterY - originRY));
+        const kR = Math.pow((triggerZone - distLightR) / triggerZone, 0.5);
+        const lungeJitterR = Math.cos(currentTime * 0.065) * 0.15;
+        targetAngleR = targetAngleR * (1 - kR) + (directR + lungeJitterR) * kR;
+        targetStretchR = 1 + kR * 0.5;
       }
 
-      const lerpSpeedL = inRangeL ? 0.38 : 0.08;
-      const lerpSpeedR = inRangeR ? 0.38 : 0.08;
+      const snapSpeedL = inZoneL ? 0.32 : 0.09;
+      const snapSpeedR = inZoneR ? 0.32 : 0.09;
 
-      curAngleL += (targetAngleL - curAngleL) * lerpSpeedL;
-      curAngleR += (targetAngleR - curAngleR) * lerpSpeedR;
+      curAngleL += (targetAngleL - curAngleL) * snapSpeedL;
+      curAngleR += (targetAngleR - curAngleR) * snapSpeedR;
 
-      curStretchL += (targetStretchL - curStretchL) * lerpSpeedL;
-      curStretchR += (targetStretchR - curStretchR) * lerpSpeedR;
+      curStretchL += (targetStretchL - curStretchL) * snapSpeedL;
+      curStretchR += (targetStretchR - curStretchR) * snapSpeedR;
 
       jointLeft.style.transform = `rotate(${curAngleL}rad)`;
       jointRight.style.transform = `rotate(${curAngleR}rad)`;
 
-      const waveL = 1 + Math.sin(phaseL * 3.2) * 0.08;
+      const waveL = 1 + Math.sin(phaseL * 3.4) * 0.07;
       const squishL = 1 / Math.sqrt(curStretchL * waveL);
-      const skewL = Math.sin(phaseL * 2.2) * 9;
+      const skewL = Math.sin(phaseL * 2.3) * 8;
 
-      const waveR = 1 + Math.sin(phaseR * 3.5 + 1.1) * 0.08;
+      const waveR = 1 + Math.sin(phaseR * 3.1 + 1.2) * 0.07;
       const squishR = 1 / Math.sqrt(curStretchR * waveR);
-      const skewR = Math.sin(phaseR * 2.4 + 1.3) * 9;
+      const skewR = Math.sin(phaseR * 2.5 + 1.4) * 8;
 
       maggotLeftImg.style.transform = `scaleY(${curStretchL * waveL}) scaleX(${squishL}) skewX(${skewL}deg)`;
       maggotRightImg.style.transform = `scaleX(-1) scaleY(${curStretchR * waveR}) scaleX(${squishR}) skewX(${-skewR}deg)`;
 
-      const actualLenL = maggotReach * curStretchL;
-      const actualLenR = maggotReach * curStretchR;
+      const reachL = maggotBaseReach * curStretchL;
+      const reachR = maggotBaseReach * curStretchR;
 
-      const tipLX = originLX + Math.sin(curAngleL) * actualLenL;
-      const tipLY = originLY - Math.cos(curAngleL) * actualLenL;
+      const tipLX = originLX + Math.sin(curAngleL) * reachL;
+      const tipLY = originLY - Math.cos(curAngleL) * reachL;
+      const midLX = originLX + Math.sin(curAngleL) * (reachL * 0.75);
+      const midLY = originLY - Math.cos(curAngleL) * (reachL * 0.75);
 
-      const tipRX = originRX + Math.sin(curAngleR) * actualLenR;
-      const tipRY = originRY - Math.cos(curAngleR) * actualLenR;
+      const tipRX = originRX + Math.sin(curAngleR) * reachR;
+      const tipRY = originRY - Math.cos(curAngleR) * reachR;
+      const midRX = originRX + Math.sin(curAngleR) * (reachR * 0.75);
+      const midRY = originRY - Math.cos(curAngleR) * (reachR * 0.75);
 
-      const contactDistL = distToSegment(bulbCenterBottomX, bulbCenterBottomY, originLX, originLY, tipLX, tipLY);
-      const contactDistR = distToSegment(bulbCenterBottomX, bulbCenterBottomY, originRX, originRY, tipRX, tipRY);
+      const distTipL = Math.hypot(bulbCenterX - tipLX, bulbCenterY - tipLY);
+      const distMidL = Math.hypot(bulbCenterX - midLX, bulbCenterY - midLY);
 
-      if (contactDistL < 38 || contactDistR < 38) {
+      const distTipR = Math.hypot(bulbCenterX - tipRX, bulbCenterY - tipRY);
+      const distMidR = Math.hypot(bulbCenterX - midRX, bulbCenterY - midRY);
+
+      if (distTipL < 34 || distMidL < 28 || distTipR < 34 || distMidR < 28) {
         breakBulbAndClose();
         return;
       }
