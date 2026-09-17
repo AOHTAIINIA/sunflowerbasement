@@ -39,8 +39,8 @@
 
     #light {
       position: absolute;
-      width: 460px;
-      height: 460px;
+      width: 440px;
+      height: 440px;
       border-radius: 50%;
       background: radial-gradient(circle, rgba(255, 140, 25, 0.09) 0%, rgba(180, 60, 10, 0.025) 35%, rgba(30, 10, 0, 0.005) 60%, transparent 75%);
       mix-blend-mode: screen;
@@ -64,51 +64,66 @@
       will-change: transform, left, top;
     }
 
-    #creature-container {
+    #creature {
       position: absolute;
-      bottom: -15px;
+      bottom: -10px;
       left: 50%;
       transform: translateX(-50%);
-      width: 420px;
-      height: 450px;
+      width: 320px;
       pointer-events: none;
       z-index: 10;
     }
 
     #body-img {
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 250px;
+      width: 100%;
       height: auto;
+      display: block;
+      position: relative;
       z-index: 12;
       user-select: none;
       -webkit-user-drag: none;
     }
 
-    .maggot {
+    .arm-socket {
       position: absolute;
-      width: 140px;
-      height: auto;
-      user-select: none;
-      -webkit-user-drag: none;
+      top: 27%;
+      width: 0;
+      height: 0;
+      z-index: 11;
+    }
+
+    #shoulder-left {
+      left: 40px;
+    }
+
+    #shoulder-right {
+      right: 40px;
+    }
+
+    .maggot-joint {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      transform-origin: 0 0;
       will-change: transform;
     }
 
-    #maggot-left {
-      top: 155px;
-      left: 70px;
-      transform-origin: 90% 25%;
-      z-index: 11;
+    .maggot-img {
+      position: absolute;
+      right: 0;
+      top: -35px;
+      width: 165px;
+      height: auto;
+      user-select: none;
+      -webkit-user-drag: none;
+      transform-origin: 100% 35px;
+      will-change: transform;
     }
 
-    #maggot-right {
-      top: 155px;
-      right: 70px;
-      transform-origin: 10% 25%;
+    #maggot-right-img {
       transform: scaleX(-1);
-      z-index: 11;
     }
 
     #shatter-flash {
@@ -128,9 +143,19 @@
     <div id="light"></div>
     <img id="bulb" src="bulb.png" alt="">
 
-    <div id="creature-container">
-      <img id="maggot-left" class="maggot" src="maggot.png" alt="">
-      <img id="maggot-right" class="maggot" src="maggot.png" alt="">
+    <div id="creature">
+      <div id="shoulder-left" class="arm-socket">
+        <div id="joint-left" class="maggot-joint">
+          <img id="maggot-left-img" class="maggot-img" src="maggot.png" alt="">
+        </div>
+      </div>
+
+      <div id="shoulder-right" class="arm-socket">
+        <div id="joint-right" class="maggot-joint">
+          <img id="maggot-right-img" class="maggot-img" src="maggot.png" alt="">
+        </div>
+      </div>
+
       <img id="body-img" src="body.png" alt="">
     </div>
 
@@ -142,8 +167,12 @@
     const ctx = canvas.getContext('2d');
     const bulb = document.getElementById('bulb');
     const light = document.getElementById('light');
-    const maggotLeft = document.getElementById('maggot-left');
-    const maggotRight = document.getElementById('maggot-right');
+    const jointLeft = document.getElementById('joint-left');
+    const jointRight = document.getElementById('joint-right');
+    const maggotLeftImg = document.getElementById('maggot-left-img');
+    const maggotRightImg = document.getElementById('maggot-right-img');
+    const shoulderLeft = document.getElementById('shoulder-left');
+    const shoulderRight = document.getElementById('shoulder-right');
     const flash = document.getElementById('shatter-flash');
 
     bulb.ondragstart = () => false;
@@ -292,24 +321,24 @@
     function playGlassCrackSound() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const bufferSize = audioCtx.sampleRate * 0.4;
+        const bufferSize = audioCtx.sampleRate * 0.35;
         const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.12));
         }
         const noise = audioCtx.createBufferSource();
         noise.buffer = buffer;
         const filter = audioCtx.createBiquadFilter();
         filter.type = 'highpass';
-        filter.frequency.value = 2400;
+        filter.frequency.value = 2600;
         noise.connect(filter);
         filter.connect(audioCtx.destination);
         noise.start();
       } catch (err) {}
     }
 
-    function breakAndKillSite() {
+    function killSite() {
       if (isDead) return;
       isDead = true;
       isDragging = false;
@@ -331,15 +360,25 @@
 
         setTimeout(() => {
           location.href = 'about:blank';
-        }, 300);
-      }, 70);
+        }, 200);
+      }, 60);
     }
 
-    let leftAngleCur = 0;
-    let rightAngleCur = 0;
+    const baseAngleL = Math.atan2(0.35, -1);
+    const baseAngleR = Math.atan2(0.35, 1);
 
-    function render(time) {
+    let curAngleL = 0;
+    let curAngleR = 0;
+
+    let phaseL = Math.random() * 50;
+    let phaseR = Math.random() * 50;
+    let lastTime = performance.now();
+
+    function render(currentTime) {
       if (isDead) return;
+
+      const dt = Math.min(0.05, (currentTime - lastTime) * 0.001);
+      lastTime = currentTime;
 
       updatePhysics();
 
@@ -381,53 +420,73 @@
       light.style.left = lightX + 'px';
       light.style.top = lightY + 'px';
 
-      const t = time * 0.003;
+      const rectL = shoulderLeft.getBoundingClientRect();
+      const originLX = rectL.left;
+      const originLY = rectL.top;
 
-      const rectL = maggotLeft.getBoundingClientRect();
-      const originLX = rectL.left + rectL.width * 0.9;
-      const originLY = rectL.top + rectL.height * 0.25;
-
-      const rectR = maggotRight.getBoundingClientRect();
-      const originRX = rectR.left + rectR.width * 0.1;
-      const originRY = rectR.top + rectR.height * 0.25;
+      const rectR = shoulderRight.getBoundingClientRect();
+      const originRX = rectR.left;
+      const originRY = rectR.top;
 
       const distL = Math.hypot(lightX - originLX, lightY - originLY);
       const distR = Math.hypot(lightX - originRX, lightY - originRY);
 
-      if (distL < 90 || distR < 90) {
-        breakAndKillSite();
+      if (distL < 105 || distR < 105) {
+        killSite();
         return;
       }
 
-      const idleL = Math.sin(t * 1.8) * 14 + Math.sin(t * 3.4) * 8;
-      const idleR = Math.sin(t * 1.6 + 2) * 14 + Math.sin(t * 3.1 + 1) * 8;
+      const reactRange = 480;
+      const kL = Math.pow(Math.max(0, 1 - distL / reactRange), 1.6);
+      const kR = Math.pow(Math.max(0, 1 - distR / reactRange), 1.6);
 
-      const reactRange = 460;
+      phaseL += dt * (2.2 + kL * 4.5);
+      phaseR += dt * (2.5 + kR * 4.5);
 
-      let targetAngleL = idleL;
-      if (distL < reactRange) {
-        const directAngleL = Math.atan2(lightY - originLY, lightX - originLX) * (180 / Math.PI) + 180;
-        const k = 1 - Math.min(1, distL / reactRange);
-        targetAngleL = idleL * (1 - k) + (directAngleL - 180) * k;
+      const idleL = Math.sin(phaseL * 0.9) * 0.32
+                  + Math.sin(phaseL * 2.1 + 1.2) * 0.18
+                  + Math.cos(phaseL * 0.45 + 3.1) * 0.22
+                  + Math.sin(phaseL * 4.1) * 0.07;
+
+      const idleR = Math.sin(phaseR * 1.1 + 2.4) * 0.32
+                  + Math.cos(phaseR * 1.8 + 0.6) * 0.18
+                  + Math.sin(phaseR * 0.52 + 1.4) * 0.22
+                  + Math.cos(phaseR * 4.4) * 0.07;
+
+      let targetDiffL = idleL;
+      if (kL > 0) {
+        const thetaL = Math.atan2(lightY - originLY, lightX - originLX);
+        let diffL = thetaL - baseAngleL;
+        while (diffL > Math.PI) diffL -= Math.PI * 2;
+        while (diffL < -Math.PI) diffL += Math.PI * 2;
+        targetDiffL = idleL * (1 - kL) + diffL * kL;
       }
 
-      let targetAngleR = idleR;
-      if (distR < reactRange) {
-        const directAngleR = Math.atan2(lightY - originRY, lightX - originRX) * (180 / Math.PI);
-        const k = 1 - Math.min(1, distR / reactRange);
-        targetAngleR = idleR * (1 - k) + (-directAngleR) * k;
+      let targetDiffR = idleR;
+      if (kR > 0) {
+        const thetaR = Math.atan2(lightY - originRY, lightX - originRX);
+        let diffR = thetaR - baseAngleR;
+        while (diffR > Math.PI) diffR -= Math.PI * 2;
+        while (diffR < -Math.PI) diffR += Math.PI * 2;
+        targetDiffR = idleR * (1 - kR) + diffR * kR;
       }
 
-      leftAngleCur += (targetAngleL - leftAngleCur) * 0.08;
-      rightAngleCur += (targetAngleR - rightAngleCur) * 0.08;
+      curAngleL += (targetDiffL - curAngleL) * 0.12;
+      curAngleR += (targetDiffR - curAngleR) * 0.12;
 
-      const squirmL = 1 + Math.sin(t * 4) * 0.08;
-      const squirmR = 1 + Math.sin(t * 4.3 + 1.2) * 0.08;
-      const stretchL = distL < reactRange ? 1 + (1 - distL / reactRange) * 0.22 : 1;
-      const stretchR = distR < reactRange ? 1 + (1 - distR / reactRange) * 0.22 : 1;
+      jointLeft.style.transform = `rotate(${curAngleL}rad)`;
+      jointRight.style.transform = `rotate(${curAngleR}rad)`;
 
-      maggotLeft.style.transform = `rotate(${leftAngleCur}deg) scaleX(${stretchL}) scaleY(${squirmL}) skewX(${Math.sin(t * 2) * 6}deg)`;
-      maggotRight.style.transform = `scaleX(-1) rotate(${rightAngleCur}deg) scaleX(${stretchR}) scaleY(${squirmR}) skewX(${Math.sin(t * 2.2) * 6}deg)`;
+      const stretchL = (1 + Math.sin(phaseL * 2.8) * 0.09) * (1 + kL * 0.28);
+      const thickL = 1 / Math.sqrt(stretchL);
+      const skewL = Math.sin(phaseL * 2.2) * 7;
+
+      const stretchR = (1 + Math.sin(phaseR * 3.1 + 1.7) * 0.09) * (1 + kR * 0.28);
+      const thickR = 1 / Math.sqrt(stretchR);
+      const skewR = Math.sin(phaseR * 2.4 + 2.1) * 7;
+
+      maggotLeftImg.style.transform = `scaleX(${stretchL}) scaleY(${thickL}) skewY(${skewL}deg)`;
+      maggotRightImg.style.transform = `scaleX(-1) scaleX(${stretchR}) scaleY(${thickR}) skewY(${-skewR}deg)`;
 
       requestAnimationFrame(render);
     }
